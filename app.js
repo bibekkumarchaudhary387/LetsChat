@@ -293,9 +293,7 @@ function backToGroups() {
     document.getElementById('groupManager').classList.remove('hidden');
     document.getElementById('groupsList').classList.remove('hidden');
     
-    // Disconnect from P2P network
-    p2pChat.disconnect();
-    
+    // Don't disconnect - just leave the group room
     currentGroup = null;
     replyingTo = null;
 }
@@ -316,7 +314,7 @@ function displayMessages() {
 }
 
 // Connection status indicator
-function updateConnectionStatus(isConnected) {
+function updateConnectionStatus(isConnected, message = '') {
     const indicator = document.querySelector('.online-indicator');
     if (indicator) {
         if (isConnected) {
@@ -324,14 +322,21 @@ function updateConnectionStatus(isConnected) {
             indicator.title = 'Connected to server';
         } else {
             indicator.style.background = '#f44336';
-            indicator.title = 'Disconnected from server';
+            indicator.title = message || 'Disconnected from server';
         }
     }
 }
 
-// Initialize connection status as disconnected
+// Initialize connection status
 document.addEventListener('DOMContentLoaded', function() {
     updateConnectionStatus(false);
+});
+
+// Only disconnect when user actually leaves the website
+window.addEventListener('beforeunload', function() {
+    if (p2pChat.socket) {
+        p2pChat.disconnect();
+    }
 });
 
 // Close emoji picker when clicking outside

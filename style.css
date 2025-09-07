@@ -215,13 +215,15 @@ body {
         padding: 0.75rem;
     }
     
-    /* Ensure chat options are visible on mobile */
-    .hidden {
-        display: none !important;
+    /* Force show chat buttons on mobile */
+    .chat-actions {
+        visibility: visible !important;
+        opacity: 1 !important;
     }
     
-    .chat-actions button:not(.hidden) {
-        display: inline-block !important;
+    .chat-actions button {
+        visibility: visible !important;
+        opacity: 1 !important;
     }
 }
 
@@ -646,19 +648,36 @@ header h1 {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        min-height: 60px;
     }
     
     .chat-actions {
         display: flex !important;
         gap: 0.5rem;
         margin-left: auto;
+        flex-shrink: 0;
     }
     
     .chat-actions button {
-        display: block !important;
-        padding: 8px 12px;
-        font-size: 0.85rem;
-        border-radius: 15px;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+        font-size: 1.1rem;
+        border-radius: 50%;
+        min-width: 40px;
+        height: 40px;
+        background: rgba(255,255,255,0.2) !important;
+        border: none;
+        color: white;
+    }
+    
+    .chat-actions button:hover {
+        background: rgba(255,255,255,0.3) !important;
+    }
+    
+    #adminBtn:not(.hidden) {
+        display: flex !important;
     }
     
     .message-input {

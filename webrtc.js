@@ -9,31 +9,15 @@ class P2PChat {
     connect(groupId) {
         this.currentGroupId = groupId;
         
-        if (!this.socket || !this.socket.connected) {
-            this.socket = io({
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: 10,
-                timeout: 20000,
-                forceNew: true
-            });
+        if (!this.socket) {
+            this.socket = io();
             this.setupSocketEvents();
         }
         
-        // Wait for connection before joining
-        if (this.socket.connected) {
-            this.socket.emit('join-group', {
-                groupId: groupId,
-                userName: currentUser
-            });
-        } else {
-            this.socket.on('connect', () => {
-                this.socket.emit('join-group', {
-                    groupId: groupId,
-                    userName: currentUser
-                });
-            });
-        }
+        this.socket.emit('join-group', {
+            groupId: groupId,
+            userName: currentUser
+        });
     }
 
     setupSocketEvents() {
@@ -43,38 +27,10 @@ class P2PChat {
             updateConnectionStatus(true);
         });
         
-        this.socket.on('disconnect', (reason) => {
-            console.log('Disconnected from server:', reason);
+        this.socket.on('disconnect', () => {
+            console.log('Disconnected from server');
             this.isConnected = false;
             updateConnectionStatus(false);
-            
-            // Auto-reconnect after 2 seconds
-            setTimeout(() => {
-                if (!this.socket.connected) {
-                    console.log('Attempting to reconnect...');
-                    this.socket.connect();
-                }
-            }, 2000);
-        });
-        
-        this.socket.on('connect_error', (error) => {
-            console.log('Connection error:', error);
-            this.isConnected = false;
-            updateConnectionStatus(false);
-        });
-        
-        this.socket.on('reconnect', () => {
-            console.log('Reconnected to server');
-            this.isConnected = true;
-            updateConnectionStatus(true);
-            
-            // Rejoin current group if in chat
-            if (this.currentGroupId && currentGroup) {
-                this.socket.emit('join-group', {
-                    groupId: this.currentGroupId,
-                    userName: currentUser
-                });
-            }
         });
         
         this.socket.on('new-message', (data) => {
@@ -115,57 +71,29 @@ class P2PChat {
     }
 
     createGroup(groupId, groupCode, groupName) {
-        if (!this.socket || !this.socket.connected) {
-            this.socket = io({
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: 10,
-                timeout: 20000,
-                forceNew: true
-            });
+        if (!this.socket) {
+            this.socket = io();
             this.setupSocketEvents();
         }
         
-        const createGroupData = {
+        this.socket.emit('create-group', {
             groupId: groupId,
             groupCode: groupCode,
             groupName: groupName,
             userName: currentUser
-        };
-        
-        if (this.socket.connected) {
-            this.socket.emit('create-group', createGroupData);
-        } else {
-            this.socket.on('connect', () => {
-                this.socket.emit('create-group', createGroupData);
-            });
-        }
+        });
     }
 
     joinByCode(groupCode) {
-        if (!this.socket || !this.socket.connected) {
-            this.socket = io({
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: 10,
-                timeout: 20000,
-                forceNew: true
-            });
+        if (!this.socket) {
+            this.socket = io();
             this.setupSocketEvents();
         }
         
-        const joinData = {
+        this.socket.emit('join-group', {
             groupCode: groupCode.toUpperCase(),
             userName: currentUser
-        };
-        
-        if (this.socket.connected) {
-            this.socket.emit('join-group', joinData);
-        } else {
-            this.socket.on('connect', () => {
-                this.socket.emit('join-group', joinData);
-            });
-        }
+        });
     }
 
     broadcastMessage(message) {
@@ -192,8 +120,11 @@ class P2PChat {
     }
 
     disconnect() {
+        // Only disconnect when user actually leaves the website
+        // Not when switching between groups or pages
         if (this.socket) {
             this.socket.disconnect();
+            this.socket = null;
         }
         this.isConnected = false;
     }

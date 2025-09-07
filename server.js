@@ -63,10 +63,7 @@ io.on('connection', (socket) => {
                 members: group.members
             });
             
-            console.log(`${userName} joined group ${group.name} (${group.code})`);
-            
-        } else {
-            console.log(`Failed to join group with code: ${groupCode}`);
+            } else {
             socket.emit('group-joined', {
                 success: false,
                 message: 'Group does not exist'
@@ -91,8 +88,6 @@ io.on('connection', (socket) => {
         groups.set(groupId, group);
         socket.join(groupId);
         userSockets.set(socket.id, { userName, groupId });
-        
-        console.log(`Group created: ${groupName} with code ${groupCode} by ${userName}`);
         
         socket.emit('group-created', {
             success: true,
@@ -142,6 +137,8 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
