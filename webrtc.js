@@ -68,6 +68,15 @@ class P2PChat {
                 saveGroups();
             }
         });
+        
+        this.socket.on('user-left', (data) => {
+            console.log(`${data.userName} left the group`);
+            if (currentGroup && data.members) {
+                currentGroup.members = data.members;
+                groups[currentGroup.id] = currentGroup;
+                saveGroups();
+            }
+        });
     }
 
     createGroup(groupId, groupCode, groupName) {

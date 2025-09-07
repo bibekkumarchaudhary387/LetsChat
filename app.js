@@ -519,11 +519,18 @@ function kickMember(memberName) {
 function leaveGroup() {
     if (!confirm('Are you sure you want to leave this group?')) return;
     
+    // Notify server about leaving
+    if (p2pChat.socket && currentGroup) {
+        p2pChat.socket.emit('leave-group', {
+            groupId: currentGroup.id,
+            userName: currentUser
+        });
+    }
+    
+    // Remove from local storage
     if (currentGroup.admin === currentUser) {
-        // If admin leaves, delete the group
         delete groups[currentGroup.id];
     } else {
-        // Remove user from members
         currentGroup.members = currentGroup.members.filter(member => member !== currentUser);
         groups[currentGroup.id] = currentGroup;
     }

@@ -662,14 +662,15 @@ header h1 {
         display: flex !important;
         align-items: center;
         justify-content: center;
-        padding: 10px;
-        font-size: 1.1rem;
-        border-radius: 50%;
-        min-width: 40px;
-        height: 40px;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        border-radius: 20px;
+        min-width: 60px;
+        height: 36px;
         background: rgba(255,255,255,0.2) !important;
         border: none;
         color: white;
+        white-space: nowrap;
     }
     
     .chat-actions button:hover {
@@ -678,6 +679,15 @@ header h1 {
     
     #adminBtn:not(.hidden) {
         display: flex !important;
+    }
+    
+    .chat-header {
+        flex-wrap: nowrap !important;
+    }
+    
+    .chat-actions {
+        flex-shrink: 0 !important;
+        min-width: fit-content !important;
     }
     
     .message-input {

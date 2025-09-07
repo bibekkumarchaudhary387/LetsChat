@@ -15,7 +15,7 @@ const io = socketIo(server, {
 // Serve static files
 app.use(express.static(__dirname));
 
-// In-memory storage for groups
+// In-memory storage for groups (no messages stored)
 const groups = new Map();
 const userSockets = new Map();
 
@@ -81,7 +81,6 @@ io.on('connection', (socket) => {
             name: groupName,
             admin: userName,
             members: [userName],
-            messages: [],
             created: Date.now()
         };
         
@@ -95,33 +94,47 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Send message
+    // Send message (don't store on server)
     socket.on('send-message', (data) => {
         const { groupId, message } = data;
         const group = groups.get(groupId);
         
         if (group) {
-            group.messages.push(message);
-            
-            // Broadcast to all users in group
+            // Just broadcast to all users in group (don't store)
             io.to(groupId).emit('new-message', {
                 message: message
             });
         }
     });
 
-    // Get group messages
-    socket.on('get-messages', (data) => {
-        const { groupId } = data;
+
+
+    // Leave group
+    socket.on('leave-group', (data) => {
+        const { groupId, userName } = data;
         const group = groups.get(groupId);
         
         if (group) {
-            socket.emit('messages-loaded', {
-                messages: group.messages
+            // Remove user from group
+            group.members = group.members.filter(member => member !== userName);
+            
+            // If admin leaves or no members left, delete group
+            if (group.admin === userName || group.members.length === 0) {
+                groups.delete(groupId);
+            } else {
+                groups.set(groupId, group);
+            }
+            
+            // Notify others
+            socket.to(groupId).emit('user-left', {
+                userName: userName,
+                members: group.members
             });
         }
+        
+        socket.leave(groupId);
     });
-
+    
     // Disconnect
     socket.on('disconnect', () => {
         const userData = userSockets.get(socket.id);
