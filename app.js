@@ -129,6 +129,9 @@ function confirmCreateGroup() {
     saveGroups();
     displayGroups();
     
+    // Create group on server
+    p2pChat.createGroup(groupId, groupCode, groupName);
+    
     // Hide create modal and show link modal
     hideCreateGroup();
     showGroupLink(groupId, groupCode);
@@ -188,55 +191,28 @@ function joinGroup() {
     const input = document.getElementById('groupLink').value.trim();
     if (!input) return;
     
-    let groupId = null;
-    
     // Check if it's a link or code
     if (input.startsWith('http')) {
         try {
             const url = new URL(input);
-            groupId = url.searchParams.get('group');
+            const groupId = url.searchParams.get('group');
+            if (groupId) {
+                p2pChat.connect(groupId);
+            } else {
+                alert('Invalid group link');
+                return;
+            }
         } catch (e) {
             alert('Invalid group link');
             return;
         }
     } else {
-        // It's a code, find group by code
+        // It's a code
         const code = input.toUpperCase();
-        const foundGroup = Object.values(groups).find(g => g.code === code);
-        if (foundGroup) {
-            groupId = foundGroup.id;
-        } else {
-            // Create new group with this code (for P2P joining)
-            groupId = 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
-            const groupName = prompt('Enter group name (you are joining):') || 'New Group';
-            groups[groupId] = {
-                id: groupId,
-                code: code,
-                name: groupName,
-                admin: 'Unknown',
-                members: [currentUser],
-                messages: [],
-                created: Date.now()
-            };
-        }
+        p2pChat.joinByCode(code);
     }
     
-    if (!groupId) {
-        alert('Invalid group link or code');
-        return;
-    }
-    
-    // Join existing group or add to members
-    if (groups[groupId] && !groups[groupId].members.includes(currentUser)) {
-        groups[groupId].members.push(currentUser);
-    }
-    
-    saveGroups();
-    displayGroups();
     hideJoinGroup();
-    
-    // Connect to P2P network for this group
-    p2pChat.connect(groupId);
 }
 
 function checkGroupFromURL() {
