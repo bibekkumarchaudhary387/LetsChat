@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Name Entry Popup -->
+    <div id="namePopup" class="popup">
+        <div class="popup-content">
+            <h2>Welcome to P2P Chat</h2>
+            <input type="text" id="userName" placeholder="Enter your name" maxlength="20">
+            <button onclick="setUserName()">Continue</button>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="hidden">
+        <!-- Header -->
+        <header>
+            <h1>P2P Chat</h1>
+            <div class="user-info">
+                <span id="currentUser"></span>
+                <button onclick="showSettings()">⚙️</button>
+            </div>
+        </header>
+
+        <!-- Group Management -->
+        <div id="groupManager" class="section">
+            <div class="group-actions">
+                <button onclick="createGroup()">Create Group</button>
+                <button onclick="showJoinGroup()">Join Group</button>
+            </div>
+            
+            <div id="joinGroupForm" class="hidden">
+                <input type="text" id="groupLink" placeholder="Paste group link here">
+                <button onclick="joinGroup()">Join</button>
+                <button onclick="hideJoinGroup()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Groups List -->
+        <div id="groupsList" class="section">
+            <h3>Your Groups</h3>
+            <div id="groups"></div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div id="chatInterface" class="hidden">
+            <div class="chat-header">
+                <button onclick="backToGroups()">←</button>
+                <span id="groupName"></span>
+                <div class="chat-actions">
+                    <button onclick="showGroupSettings()" id="adminBtn" class="hidden">⚙️</button>
+                    <button onclick="leaveGroup()">Leave</button>
+                </div>
+            </div>
+
+            <div id="messages" class="messages"></div>
+            
+            <div class="message-input">
+                <input type="text" id="messageText" placeholder="Type a message..." onkeypress="handleEnter(event)">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Group Modal -->
+    <div id="createGroupModal" class="popup hidden">
+        <div class="popup-content">
+            <h3>Create New Group</h3>
+            <input type="text" id="newGroupNameInput" placeholder="Enter group name" maxlength="30">
+            <button onclick="confirmCreateGroup()">Create Group</button>
+            <button onclick="hideCreateGroup()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Group Link Modal -->
+    <div id="groupLinkModal" class="popup hidden">
+        <div class="popup-content">
+            <h3>Group Created Successfully! 🎉</h3>
+            <p>Share this link to invite members:</p>
+            <div class="link-container">
+                <input type="text" id="groupLinkDisplay" readonly>
+                <button onclick="copyGroupLink()">Copy</button>
+            </div>
+            <button onclick="hideGroupLink()">Done</button>
+        </div>
+    </div>
+
+    <!-- Group Settings Modal -->
+    <div id="groupSettings" class="popup hidden">
+        <div class="popup-content">
+            <h3>Group Settings</h3>
+            <input type="text" id="newGroupName" placeholder="New group name">
+            <button onclick="renameGroup()">Rename Group</button>
+            <div id="membersList"></div>
+            <button onclick="hideGroupSettings()">Close</button>
+        </div>
+    </div>
+
+    <script src="crypto.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,442 @@
+// Global variables
+let currentUser = '';
+let currentGroup = null;
+let groups = {};
+let crypto = new SimpleCrypto();
+let replyingTo = null;
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', function() {
+    loadUserData();
+    if (currentUser) {
+        hideNamePopup();
+        loadGroups();
+        checkGroupFromURL();
+    }
+});
+
+// User management
+function loadUserData() {
+    const userData = localStorage.getItem('p2p_user');
+    if (userData) {
+        const data = JSON.parse(userData);
+        currentUser = data.name;
+        document.getElementById('currentUser').textContent = currentUser;
+    }
+}
+
+function setUserName() {
+    const name = document.getElementById('userName').value.trim();
+    if (!name) {
+        alert('Please enter your name');
+        return;
+    }
+    
+    currentUser = name;
+    const userData = { name: currentUser, id: generateUserIP() };
+    localStorage.setItem('p2p_user', JSON.stringify(userData));
+    document.getElementById('currentUser').textContent = currentUser;
+    
+    hideNamePopup();
+    loadGroups();
+}
+
+function hideNamePopup() {
+    document.getElementById('namePopup').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+}
+
+function generateUserIP() {
+    // Simulate IP-like identifier
+    return Math.random().toString(36).substring(2, 15);
+}
+
+// Group management
+function loadGroups() {
+    const savedGroups = localStorage.getItem('p2p_groups');
+    if (savedGroups) {
+        groups = JSON.parse(savedGroups);
+        displayGroups();
+    }
+}
+
+function saveGroups() {
+    localStorage.setItem('p2p_groups', JSON.stringify(groups));
+}
+
+function displayGroups() {
+    const groupsContainer = document.getElementById('groups');
+    groupsContainer.innerHTML = '';
+    
+    if (Object.keys(groups).length === 0) {
+        groupsContainer.innerHTML = '<p style="text-align: center; color: #666; padding: 2rem;">No groups yet. Create or join a group to start chatting!</p>';
+        return;
+    }
+    
+    Object.keys(groups).forEach(groupId => {
+        const group = groups[groupId];
+        const groupElement = document.createElement('div');
+        groupElement.className = 'group-item';
+        groupElement.onclick = () => openChat(groupId);
+        
+        const lastMessage = group.messages.length > 0 ? group.messages[group.messages.length - 1] : null;
+        const lastMessageText = lastMessage ? `${lastMessage.sender}: ${lastMessage.text.substring(0, 30)}...` : 'No messages yet';
+        
+        groupElement.innerHTML = `
+            <div class="group-info">
+                <h4>${group.name} ${group.admin === currentUser ? '👑' : ''}</h4>
+                <small>${group.members.length} members • ${lastMessageText}</small>
+            </div>
+            <div style="font-size: 0.8rem; color: #666;">
+                ${lastMessage ? new Date(lastMessage.timestamp).toLocaleDateString() : ''}
+            </div>
+        `;
+        
+        groupsContainer.appendChild(groupElement);
+    });
+}
+
+function createGroup() {
+    document.getElementById('createGroupModal').classList.remove('hidden');
+}
+
+function hideCreateGroup() {
+    document.getElementById('createGroupModal').classList.add('hidden');
+    document.getElementById('newGroupNameInput').value = '';
+}
+
+function confirmCreateGroup() {
+    const groupName = document.getElementById('newGroupNameInput').value.trim();
+    if (!groupName) {
+        alert('Please enter a group name');
+        return;
+    }
+    
+    const groupId = 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+    const group = {
+        id: groupId,
+        name: groupName,
+        admin: currentUser,
+        members: [currentUser],
+        messages: [],
+        created: Date.now()
+    };
+    
+    groups[groupId] = group;
+    saveGroups();
+    displayGroups();
+    
+    // Hide create modal and show link modal
+    hideCreateGroup();
+    showGroupLink(groupId);
+}
+
+function showGroupLink(groupId) {
+    const groupLink = `${window.location.origin}${window.location.pathname}?group=${groupId}`;
+    document.getElementById('groupLinkDisplay').value = groupLink;
+    document.getElementById('groupLinkModal').classList.remove('hidden');
+}
+
+function hideGroupLink() {
+    document.getElementById('groupLinkModal').classList.add('hidden');
+}
+
+function copyGroupLink() {
+    const linkInput = document.getElementById('groupLinkDisplay');
+    linkInput.select();
+    linkInput.setSelectionRange(0, 99999);
+    
+    try {
+        document.execCommand('copy');
+        alert('Link copied to clipboard!');
+    } catch (err) {
+        // Fallback for modern browsers
+        navigator.clipboard.writeText(linkInput.value).then(() => {
+            alert('Link copied to clipboard!');
+        }).catch(() => {
+            alert('Please copy the link manually');
+        });
+    }
+}
+
+function showJoinGroup() {
+    document.getElementById('joinGroupForm').classList.remove('hidden');
+}
+
+function hideJoinGroup() {
+    document.getElementById('joinGroupForm').classList.add('hidden');
+    document.getElementById('groupLink').value = '';
+}
+
+function joinGroup() {
+    const link = document.getElementById('groupLink').value.trim();
+    if (!link) return;
+    
+    const url = new URL(link);
+    const groupId = url.searchParams.get('group');
+    
+    if (!groupId) {
+        alert('Invalid group link');
+        return;
+    }
+    
+    // In a real P2P system, this would connect to the group
+    // For now, we'll create a placeholder group
+    if (!groups[groupId]) {
+        const groupName = prompt('Enter group name (you are joining):') || 'Unknown Group';
+        groups[groupId] = {
+            id: groupId,
+            name: groupName,
+            admin: 'Unknown',
+            members: [currentUser],
+            messages: [],
+            created: Date.now()
+        };
+    } else if (!groups[groupId].members.includes(currentUser)) {
+        groups[groupId].members.push(currentUser);
+    }
+    
+    saveGroups();
+    displayGroups();
+    hideJoinGroup();
+}
+
+function checkGroupFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const groupId = urlParams.get('group');
+    
+    if (groupId) {
+        // Auto-join group from URL
+        if (!groups[groupId]) {
+            const groupName = prompt('You are joining a group. Enter group name:') || 'New Group';
+            groups[groupId] = {
+                id: groupId,
+                name: groupName,
+                admin: 'Unknown',
+                members: [currentUser],
+                messages: [],
+                created: Date.now()
+            };
+            saveGroups();
+            displayGroups();
+        }
+        openChat(groupId);
+    }
+}
+
+// Chat functionality
+function openChat(groupId) {
+    currentGroup = groups[groupId];
+    if (!currentGroup) return;
+    
+    document.getElementById('groupManager').classList.add('hidden');
+    document.getElementById('groupsList').classList.add('hidden');
+    document.getElementById('chatInterface').classList.remove('hidden');
+    
+    document.getElementById('groupName').textContent = currentGroup.name;
+    
+    // Show admin button if user is admin
+    if (currentGroup.admin === currentUser) {
+        document.getElementById('adminBtn').classList.remove('hidden');
+    } else {
+        document.getElementById('adminBtn').classList.add('hidden');
+    }
+    
+    displayMessages();
+}
+
+function backToGroups() {
+    document.getElementById('chatInterface').classList.add('hidden');
+    document.getElementById('groupManager').classList.remove('hidden');
+    document.getElementById('groupsList').classList.remove('hidden');
+    currentGroup = null;
+    replyingTo = null;
+}
+
+function displayMessages() {
+    const messagesContainer = document.getElementById('messages');
+    messagesContainer.innerHTML = '';
+    
+    currentGroup.messages.forEach((message, index) => {
+        const messageElement = createMessageElement(message, index);
+        messagesContainer.appendChild(messageElement);
+    });
+    
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function createMessageElement(message, index) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${message.sender === currentUser ? 'own' : ''}`;
+    
+    let replyHtml = '';
+    if (message.replyTo !== undefined) {
+        const repliedMessage = currentGroup.messages[message.replyTo];
+        if (repliedMessage) {
+            replyHtml = `
+                <div class="reply-indicator">
+                    Replying to ${repliedMessage.sender}: ${repliedMessage.text.substring(0, 50)}${repliedMessage.text.length > 50 ? '...' : ''}
+                </div>
+            `;
+        }
+    }
+    
+    messageDiv.innerHTML = `
+        <div class="message-info">
+            ${message.sender} • ${new Date(message.timestamp).toLocaleTimeString()}
+        </div>
+        <div class="message-bubble" data-index="${index}">
+            ${replyHtml}
+            <div>${message.text}</div>
+            <button class="reply-button" onclick="setReply(${index})">↩️</button>
+        </div>
+    `;
+    
+    // Add swipe functionality
+    const bubble = messageDiv.querySelector('.message-bubble');
+    let startX = 0;
+    let currentX = 0;
+    
+    bubble.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+    });
+    
+    bubble.addEventListener('touchmove', (e) => {
+        currentX = e.touches[0].clientX;
+        const diffX = startX - currentX;
+        
+        if (diffX > 50) {
+            bubble.classList.add('swiped');
+        } else {
+            bubble.classList.remove('swiped');
+        }
+    });
+    
+    bubble.addEventListener('touchend', () => {
+        if (bubble.classList.contains('swiped')) {
+            setReply(index);
+        }
+        bubble.classList.remove('swiped');
+    });
+    
+    return messageDiv;
+}
+
+function setReply(messageIndex) {
+    replyingTo = messageIndex;
+    const repliedMessage = currentGroup.messages[messageIndex];
+    const input = document.getElementById('messageText');
+    input.placeholder = `Replying to ${repliedMessage.sender}: ${repliedMessage.text.substring(0, 30)}...`;
+    input.focus();
+}
+
+function sendMessage() {
+    const messageText = document.getElementById('messageText').value.trim();
+    if (!messageText) return;
+    
+    const message = {
+        id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15),
+        text: messageText,
+        sender: currentUser,
+        timestamp: Date.now(),
+        replyTo: replyingTo
+    };
+    
+    currentGroup.messages.push(message);
+    groups[currentGroup.id] = currentGroup;
+    saveGroups();
+    
+    document.getElementById('messageText').value = '';
+    document.getElementById('messageText').placeholder = 'Type a message...';
+    replyingTo = null;
+    
+    displayMessages();
+}
+
+function handleEnter(event) {
+    if (event.key === 'Enter') {
+        sendMessage();
+    }
+}
+
+// Group settings
+function showGroupSettings() {
+    if (currentGroup.admin !== currentUser) return;
+    
+    document.getElementById('newGroupName').value = currentGroup.name;
+    displayMembers();
+    document.getElementById('groupSettings').classList.remove('hidden');
+}
+
+function hideGroupSettings() {
+    document.getElementById('groupSettings').classList.add('hidden');
+}
+
+function displayMembers() {
+    const membersList = document.getElementById('membersList');
+    membersList.innerHTML = '<h4>Members:</h4>';
+    
+    currentGroup.members.forEach(member => {
+        const memberDiv = document.createElement('div');
+        memberDiv.className = 'member-item';
+        memberDiv.innerHTML = `
+            <span>${member} ${member === currentGroup.admin ? '(Admin)' : ''}</span>
+            ${member !== currentGroup.admin && currentGroup.admin === currentUser ? 
+                `<button onclick="kickMember('${member}')">Kick</button>` : ''}
+        `;
+        membersList.appendChild(memberDiv);
+    });
+}
+
+function renameGroup() {
+    const newName = document.getElementById('newGroupName').value.trim();
+    if (!newName) return;
+    
+    currentGroup.name = newName;
+    groups[currentGroup.id] = currentGroup;
+    saveGroups();
+    
+    document.getElementById('groupName').textContent = newName;
+    displayGroups();
+    hideGroupSettings();
+}
+
+function kickMember(memberName) {
+    if (currentGroup.admin !== currentUser) return;
+    
+    currentGroup.members = currentGroup.members.filter(member => member !== memberName);
+    groups[currentGroup.id] = currentGroup;
+    saveGroups();
+    
+    displayMembers();
+}
+
+function leaveGroup() {
+    if (!confirm('Are you sure you want to leave this group?')) return;
+    
+    if (currentGroup.admin === currentUser) {
+        // If admin leaves, delete the group
+        delete groups[currentGroup.id];
+    } else {
+        // Remove user from members
+        currentGroup.members = currentGroup.members.filter(member => member !== currentUser);
+        groups[currentGroup.id] = currentGroup;
+    }
+    
+    saveGroups();
+    backToGroups();
+    displayGroups();
+}
+
+function showSettings() {
+    const action = confirm('Do you want to change your name?');
+    if (action) {
+        const newName = prompt('Enter new name:', currentUser);
+        if (newName && newName.trim()) {
+            currentUser = newName.trim();
+            const userData = { name: currentUser, id: generateUserIP() };
+            localStorage.setItem('p2p_user', JSON.stringify(userData));
+            document.getElementById('currentUser').textContent = currentUser;
+        }
+    }
+}
