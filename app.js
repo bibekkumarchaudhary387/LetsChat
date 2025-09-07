@@ -284,7 +284,20 @@ function displayMessages() {
     });
     
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Add scroll event listener
+    messagesContainer.addEventListener('scroll', checkScrollPosition);
 }
+
+// Close emoji picker when clicking outside
+document.addEventListener('click', function(event) {
+    const emojiPicker = document.getElementById('emojiPicker');
+    const emojiBtn = document.querySelector('.emoji-btn');
+    
+    if (emojiPicker && !emojiPicker.contains(event.target) && event.target !== emojiBtn) {
+        emojiPicker.classList.add('hidden');
+    }
+});
 
 function createMessageElement(message, index) {
     const messageDiv = document.createElement('div');
@@ -450,6 +463,45 @@ function leaveGroup() {
     saveGroups();
     backToGroups();
     displayGroups();
+}
+
+// Emoji and UI functions
+function toggleEmojiPicker() {
+    const picker = document.getElementById('emojiPicker');
+    picker.classList.toggle('hidden');
+}
+
+function addEmoji(emoji) {
+    const input = document.getElementById('messageText');
+    input.value += emoji;
+    input.focus();
+    document.getElementById('emojiPicker').classList.add('hidden');
+}
+
+function handleTyping() {
+    // Simple typing indicator (can be enhanced with socket events)
+    const input = document.getElementById('messageText');
+    if (input.value.trim()) {
+        // Show typing to others (implement with socket if needed)
+    }
+}
+
+function scrollToBottom() {
+    const messages = document.getElementById('messages');
+    messages.scrollTop = messages.scrollHeight;
+    document.getElementById('scrollBottom').classList.add('hidden');
+}
+
+// Auto-hide scroll button when at bottom
+function checkScrollPosition() {
+    const messages = document.getElementById('messages');
+    const scrollBtn = document.getElementById('scrollBottom');
+    
+    if (messages.scrollTop < messages.scrollHeight - messages.clientHeight - 50) {
+        scrollBtn.classList.remove('hidden');
+    } else {
+        scrollBtn.classList.add('hidden');
+    }
 }
 
 function showSettings() {
