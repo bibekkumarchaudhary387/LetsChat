@@ -4,6 +4,7 @@ let currentGroup = null;
 let groups = {};
 let socket = null;
 let isConnected = false;
+let replyingTo = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -57,6 +58,7 @@ function initializeSocket() {
         console.log('Connected to server');
         isConnected = true;
         updateConnectionStatus(true);
+        autoRejoinGroups();
     });
     
     socket.on('disconnect', () => {
@@ -293,8 +295,8 @@ function displayMessages() {
     messagesContainer.innerHTML = '';
     
     if (currentGroup.messages) {
-        currentGroup.messages.forEach(message => {
-            const messageElement = createMessageElement(message);
+        currentGroup.messages.forEach((message, index) => {
+            const messageElement = createMessageElement(message, index);
             messagesContainer.appendChild(messageElement);
         });
     }
@@ -302,19 +304,35 @@ function displayMessages() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-function createMessageElement(message) {
+function createMessageElement(message, index) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `wa-message ${message.sender === currentUser ? 'own' : ''}`;
     
     const time = new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     
+    let replyHtml = '';
+    if (message.replyTo !== undefined && currentGroup.messages[message.replyTo]) {
+        const repliedMsg = currentGroup.messages[message.replyTo];
+        replyHtml = `
+            <div class="wa-reply-indicator">
+                ${repliedMsg.sender}: ${repliedMsg.text.substring(0, 30)}${repliedMsg.text.length > 30 ? '...' : ''}
+            </div>
+        `;
+    }
+    
     messageDiv.innerHTML = `
         ${message.sender !== currentUser ? `<div class="wa-message-info">${message.sender}</div>` : ''}
-        <div class="wa-message-bubble">
+        <div class="wa-message-bubble" data-index="${index}">
+            ${replyHtml}
             <div class="wa-message-text">${message.text}</div>
             <div class="wa-message-time">${time}</div>
+            <button class="wa-reply-btn" onclick="setReply(${index})">↩</button>
         </div>
     `;
+    
+    // Add swipe functionality
+    const bubble = messageDiv.querySelector('.wa-message-bubble');
+    addSwipeToReply(bubble, index);
     
     return messageDiv;
 }
@@ -327,7 +345,8 @@ function sendMessage() {
         id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
         text: messageText,
         sender: currentUser,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        replyTo: replyingTo
     };
     
     // Add to local storage
@@ -337,6 +356,7 @@ function sendMessage() {
     saveGroups();
     
     document.getElementById('messageText').value = '';
+    cancelReply();
     displayMessages();
     
     // Send to server
@@ -467,6 +487,66 @@ document.addEventListener('click', function(event) {
         emojiPicker.classList.add('hidden');
     }
 });
+
+// Reply functionality
+function addSwipeToReply(bubble, messageIndex) {
+    let startX = 0;
+    let currentX = 0;
+    let isDragging = false;
+    
+    bubble.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        isDragging = true;
+    });
+    
+    bubble.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        currentX = e.touches[0].clientX;
+        const diffX = startX - currentX;
+        
+        if (diffX > 30) {
+            bubble.classList.add('swiped');
+        } else {
+            bubble.classList.remove('swiped');
+        }
+    });
+    
+    bubble.addEventListener('touchend', () => {
+        if (bubble.classList.contains('swiped')) {
+            setReply(messageIndex);
+        }
+        bubble.classList.remove('swiped');
+        isDragging = false;
+    });
+}
+
+function setReply(messageIndex) {
+    replyingTo = messageIndex;
+    const message = currentGroup.messages[messageIndex];
+    
+    document.getElementById('replyToUser').textContent = message.sender;
+    document.getElementById('replyToText').textContent = message.text.substring(0, 50) + (message.text.length > 50 ? '...' : '');
+    document.getElementById('replyPreview').classList.remove('hidden');
+    
+    document.getElementById('messageText').focus();
+}
+
+function cancelReply() {
+    replyingTo = null;
+    document.getElementById('replyPreview').classList.add('hidden');
+}
+
+// Auto-rejoin groups on connect
+function autoRejoinGroups() {
+    if (socket && isConnected) {
+        Object.keys(groups).forEach(groupId => {
+            socket.emit('join-group', {
+                groupId: groupId,
+                userName: currentUser
+            });
+        });
+    }
+}
 
 // Disconnect only when leaving website
 window.addEventListener('beforeunload', function() {

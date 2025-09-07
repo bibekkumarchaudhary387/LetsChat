@@ -76,6 +76,15 @@
                 <!-- Messages -->
                 <div id="messages" class="wa-messages"></div>
                 
+                <!-- Reply Preview -->
+                <div id="replyPreview" class="wa-replying-to hidden">
+                    <div>
+                        <div id="replyToUser"></div>
+                        <div id="replyToText"></div>
+                    </div>
+                    <button onclick="cancelReply()" class="wa-cancel-reply">×</button>
+                </div>
+                
                 <!-- Message Input -->
                 <div class="wa-input-area">
                     <button onclick="toggleEmoji()" class="wa-emoji-btn">😊</button>
