@@ -32,8 +32,9 @@ io.on('connection', (socket) => {
         if (groupId) {
             group = groups.get(groupId);
         } else if (groupCode) {
+            const code = groupCode.toUpperCase();
             for (let [id, g] of groups) {
-                if (g.code === groupCode.toUpperCase()) {
+                if (g.code === code) {
                     group = g;
                     break;
                 }
@@ -44,6 +45,7 @@ io.on('connection', (socket) => {
             // Add user to group if not already there
             if (!group.members.includes(userName)) {
                 group.members.push(userName);
+                groups.set(group.id, group); // Update the group in storage
             }
             
             socket.join(group.id);
@@ -61,7 +63,10 @@ io.on('connection', (socket) => {
                 members: group.members
             });
             
+            console.log(`${userName} joined group ${group.name} (${group.code})`);
+            
         } else {
+            console.log(`Failed to join group with code: ${groupCode}`);
             socket.emit('group-joined', {
                 success: false,
                 message: 'Group does not exist'
@@ -75,7 +80,7 @@ io.on('connection', (socket) => {
         
         const group = {
             id: groupId,
-            code: groupCode,
+            code: groupCode.toUpperCase(),
             name: groupName,
             admin: userName,
             members: [userName],
@@ -86,6 +91,8 @@ io.on('connection', (socket) => {
         groups.set(groupId, group);
         socket.join(groupId);
         userSockets.set(socket.id, { userName, groupId });
+        
+        console.log(`Group created: ${groupName} with code ${groupCode} by ${userName}`);
         
         socket.emit('group-created', {
             success: true,

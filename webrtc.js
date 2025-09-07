@@ -24,11 +24,19 @@ class P2PChat {
         this.socket.on('connect', () => {
             console.log('Connected to server');
             this.isConnected = true;
+            updateConnectionStatus(true);
         });
         
         this.socket.on('disconnect', () => {
             console.log('Disconnected from server');
             this.isConnected = false;
+            updateConnectionStatus(false);
+        });
+        
+        this.socket.on('connect_error', () => {
+            console.log('Connection error');
+            this.isConnected = false;
+            updateConnectionStatus(false);
         });
         
         this.socket.on('new-message', (data) => {
@@ -49,7 +57,7 @@ class P2PChat {
                     }
                 }
             } else {
-                alert(data.message || 'Failed to join group');
+                alert(data.message || 'Group does not exist');
             }
         });
         

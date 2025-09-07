@@ -80,11 +80,12 @@ body {
 .online-indicator {
     width: 8px;
     height: 8px;
-    background: #4caf50;
+    background: #f44336;
     border-radius: 50%;
     display: inline-block;
     margin-left: 8px;
     animation: pulse 2s infinite;
+    transition: background 0.3s ease;
 }
 
 @keyframes pulse {

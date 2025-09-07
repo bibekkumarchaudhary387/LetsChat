@@ -289,6 +289,25 @@ function displayMessages() {
     messagesContainer.addEventListener('scroll', checkScrollPosition);
 }
 
+// Connection status indicator
+function updateConnectionStatus(isConnected) {
+    const indicator = document.querySelector('.online-indicator');
+    if (indicator) {
+        if (isConnected) {
+            indicator.style.background = '#4caf50';
+            indicator.title = 'Connected to server';
+        } else {
+            indicator.style.background = '#f44336';
+            indicator.title = 'Disconnected from server';
+        }
+    }
+}
+
+// Initialize connection status as disconnected
+document.addEventListener('DOMContentLoaded', function() {
+    updateConnectionStatus(false);
+});
+
 // Close emoji picker when clicking outside
 document.addEventListener('click', function(event) {
     const emojiPicker = document.getElementById('emojiPicker');
