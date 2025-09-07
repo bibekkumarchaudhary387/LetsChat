@@ -2,8 +2,8 @@
 let currentUser = '';
 let currentGroup = null;
 let groups = {};
-let crypto = new SimpleCrypto();
-let replyingTo = null;
+let socket = null;
+let isConnected = false;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -11,13 +11,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (currentUser) {
         hideNamePopup();
         loadGroups();
-        checkGroupFromURL();
+        initializeSocket();
     }
 });
 
 // User management
 function loadUserData() {
-    const userData = localStorage.getItem('p2p_user');
+    const userData = localStorage.getItem('chat_user');
     if (userData) {
         const data = JSON.parse(userData);
         currentUser = data.name;
@@ -33,12 +33,13 @@ function setUserName() {
     }
     
     currentUser = name;
-    const userData = { name: currentUser, id: generateUserIP() };
-    localStorage.setItem('p2p_user', JSON.stringify(userData));
+    const userData = { name: currentUser, id: Date.now() };
+    localStorage.setItem('chat_user', JSON.stringify(userData));
     document.getElementById('currentUser').textContent = currentUser;
     
     hideNamePopup();
     loadGroups();
+    initializeSocket();
 }
 
 function hideNamePopup() {
@@ -46,14 +47,77 @@ function hideNamePopup() {
     document.getElementById('app').classList.remove('hidden');
 }
 
-function generateUserIP() {
-    // Simulate IP-like identifier
-    return Math.random().toString(36).substring(2, 15);
+// Socket connection
+function initializeSocket() {
+    if (socket) return;
+    
+    socket = io();
+    
+    socket.on('connect', () => {
+        console.log('Connected to server');
+        isConnected = true;
+        updateConnectionStatus(true);
+    });
+    
+    socket.on('disconnect', () => {
+        console.log('Disconnected from server');
+        isConnected = false;
+        updateConnectionStatus(false);
+    });
+    
+    socket.on('group-joined', (data) => {
+        if (data.success) {
+            if (data.group) {
+                groups[data.group.id] = data.group;
+                saveGroups();
+                displayGroups();
+            }
+        } else {
+            alert(data.message || 'Group does not exist');
+        }
+    });
+    
+    socket.on('group-created', (data) => {
+        if (data.success) {
+            console.log('Group created successfully');
+        }
+    });
+    
+    socket.on('new-message', (data) => {
+        receiveMessage(data.message);
+    });
+    
+    socket.on('user-joined', (data) => {
+        if (currentGroup) {
+            currentGroup.members = data.members;
+            groups[currentGroup.id] = currentGroup;
+            saveGroups();
+            updateGroupMembers();
+        }
+    });
+    
+    socket.on('user-left', (data) => {
+        if (currentGroup && data.members) {
+            currentGroup.members = data.members;
+            groups[currentGroup.id] = currentGroup;
+            saveGroups();
+            updateGroupMembers();
+        }
+    });
+}
+
+function updateConnectionStatus(connected) {
+    const dot = document.getElementById('connectionDot');
+    if (connected) {
+        dot.classList.add('connected');
+    } else {
+        dot.classList.remove('connected');
+    }
 }
 
 // Group management
 function loadGroups() {
-    const savedGroups = localStorage.getItem('p2p_groups');
+    const savedGroups = localStorage.getItem('chat_groups');
     if (savedGroups) {
         groups = JSON.parse(savedGroups);
         displayGroups();
@@ -61,7 +125,7 @@ function loadGroups() {
 }
 
 function saveGroups() {
-    localStorage.setItem('p2p_groups', JSON.stringify(groups));
+    localStorage.setItem('chat_groups', JSON.stringify(groups));
 }
 
 function displayGroups() {
@@ -69,26 +133,32 @@ function displayGroups() {
     groupsContainer.innerHTML = '';
     
     if (Object.keys(groups).length === 0) {
-        groupsContainer.innerHTML = '<p style="text-align: center; color: #666; padding: 2rem;">No groups yet. Create or join a group to start chatting!</p>';
+        groupsContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: #8696a0;">No groups yet. Create or join a group to start chatting!</div>';
         return;
     }
     
     Object.keys(groups).forEach(groupId => {
         const group = groups[groupId];
         const groupElement = document.createElement('div');
-        groupElement.className = 'group-item';
+        groupElement.className = 'wa-chat-item';
         groupElement.onclick = () => openChat(groupId);
         
-        const lastMessage = group.messages.length > 0 ? group.messages[group.messages.length - 1] : null;
-        const lastMessageText = lastMessage ? `${lastMessage.sender}: ${lastMessage.text.substring(0, 30)}...` : 'No messages yet';
+        const lastMessage = group.messages && group.messages.length > 0 ? 
+            group.messages[group.messages.length - 1] : null;
+        const lastMessageText = lastMessage ? 
+            `${lastMessage.sender}: ${lastMessage.text.substring(0, 30)}...` : 
+            'No messages yet';
+        
+        const isAdmin = group.admin === currentUser;
         
         groupElement.innerHTML = `
-            <div class="group-info">
-                <h4>${group.name} ${group.admin === currentUser ? '👑' : ''}</h4>
-                <small>${group.members.length} members • ${lastMessageText}</small>
-            </div>
-            <div style="font-size: 0.8rem; color: #666;">
-                ${lastMessage ? new Date(lastMessage.timestamp).toLocaleDateString() : ''}
+            <div class="wa-chat-avatar">${group.name.charAt(0).toUpperCase()}</div>
+            <div class="wa-chat-info">
+                <div class="wa-chat-name">
+                    ${group.name}
+                    ${isAdmin ? '<span class="wa-admin-badge">Admin</span>' : ''}
+                </div>
+                <div class="wa-chat-last">${lastMessageText}</div>
             </div>
         `;
         
@@ -102,17 +172,17 @@ function createGroup() {
 
 function hideCreateGroup() {
     document.getElementById('createGroupModal').classList.add('hidden');
-    document.getElementById('newGroupNameInput').value = '';
+    document.getElementById('newGroupName').value = '';
 }
 
 function confirmCreateGroup() {
-    const groupName = document.getElementById('newGroupNameInput').value.trim();
+    const groupName = document.getElementById('newGroupName').value.trim();
     if (!groupName) {
         alert('Please enter a group name');
         return;
     }
     
-    const groupId = 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+    const groupId = 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     const groupCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     
     const group = {
@@ -129,53 +199,17 @@ function confirmCreateGroup() {
     saveGroups();
     displayGroups();
     
-    // Create group on server
-    p2pChat.createGroup(groupId, groupCode, groupName);
-    
-    // Hide create modal and show link modal
-    hideCreateGroup();
-    showGroupLink(groupId, groupCode);
-}
-
-function showGroupLink(groupId, groupCode) {
-    const groupLink = `${window.location.origin}${window.location.pathname}?group=${groupId}`;
-    document.getElementById('groupLinkDisplay').value = groupLink;
-    document.getElementById('groupCodeDisplay').value = groupCode;
-    document.getElementById('groupCode').textContent = groupCode;
-    document.getElementById('groupLinkModal').classList.remove('hidden');
-}
-
-function hideGroupLink() {
-    document.getElementById('groupLinkModal').classList.add('hidden');
-}
-
-function copyGroupLink() {
-    const linkInput = document.getElementById('groupLinkDisplay');
-    copyToClipboard(linkInput.value, 'Link copied to clipboard!');
-}
-
-function copyGroupCode() {
-    const codeInput = document.getElementById('groupCodeDisplay');
-    copyToClipboard(codeInput.value, 'Code copied to clipboard!');
-}
-
-function copyToClipboard(text, message) {
-    try {
-        navigator.clipboard.writeText(text).then(() => {
-            alert(message);
-        }).catch(() => {
-            // Fallback
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            alert(message);
+    if (socket && isConnected) {
+        socket.emit('create-group', {
+            groupId: groupId,
+            groupCode: groupCode,
+            groupName: groupName,
+            userName: currentUser
         });
-    } catch (err) {
-        alert('Please copy manually: ' + text);
     }
+    
+    hideCreateGroup();
+    alert(`Group created! Code: ${groupCode}`);
 }
 
 function showJoinGroup() {
@@ -194,74 +228,30 @@ function joinGroup() {
         return;
     }
     
-    // Show loading state
-    const joinBtn = document.querySelector('#joinGroupForm button:first-of-type');
-    const originalText = joinBtn.textContent;
-    joinBtn.textContent = 'Joining...';
-    joinBtn.disabled = true;
-    
-    // Check if it's a link or code
     if (input.startsWith('http')) {
         try {
             const url = new URL(input);
             const groupId = url.searchParams.get('group');
-            if (groupId) {
-                p2pChat.connect(groupId);
-            } else {
-                alert('Invalid group link');
-                resetJoinButton(joinBtn, originalText);
-                return;
+            if (groupId && socket && isConnected) {
+                socket.emit('join-group', {
+                    groupId: groupId,
+                    userName: currentUser
+                });
             }
         } catch (e) {
             alert('Invalid group link');
-            resetJoinButton(joinBtn, originalText);
-            return;
         }
     } else {
-        // It's a code - validate format
-        const code = input.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        if (code.length < 3) {
-            alert('Group code must be at least 3 characters');
-            resetJoinButton(joinBtn, originalText);
-            return;
+        const code = input.toUpperCase();
+        if (socket && isConnected) {
+            socket.emit('join-group', {
+                groupCode: code,
+                userName: currentUser
+            });
         }
-        p2pChat.joinByCode(code);
     }
-    
-    // Reset button after 3 seconds
-    setTimeout(() => {
-        resetJoinButton(joinBtn, originalText);
-    }, 3000);
     
     hideJoinGroup();
-}
-
-function resetJoinButton(btn, originalText) {
-    btn.textContent = originalText;
-    btn.disabled = false;
-}
-
-function checkGroupFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const groupId = urlParams.get('group');
-    
-    if (groupId) {
-        // Auto-join group from URL
-        if (!groups[groupId]) {
-            const groupName = prompt('You are joining a group. Enter group name:') || 'New Group';
-            groups[groupId] = {
-                id: groupId,
-                name: groupName,
-                admin: 'Unknown',
-                members: [currentUser],
-                messages: [],
-                created: Date.now()
-            };
-            saveGroups();
-            displayGroups();
-        }
-        openChat(groupId);
-    }
 }
 
 // Chat functionality
@@ -269,149 +259,64 @@ function openChat(groupId) {
     currentGroup = groups[groupId];
     if (!currentGroup) return;
     
-    document.getElementById('groupManager').classList.add('hidden');
     document.getElementById('groupsList').classList.add('hidden');
     document.getElementById('chatInterface').classList.remove('hidden');
     
     document.getElementById('groupName').textContent = currentGroup.name;
-    
-    // Show admin button if user is admin
-    if (currentGroup.admin === currentUser) {
-        document.getElementById('adminBtn').classList.remove('hidden');
-    } else {
-        document.getElementById('adminBtn').classList.add('hidden');
-    }
-    
+    updateGroupMembers();
     displayMessages();
     
-    // Connect to P2P network for real-time communication
-    p2pChat.connect(groupId);
+    if (socket && isConnected) {
+        socket.emit('join-group', {
+            groupId: groupId,
+            userName: currentUser
+        });
+    }
 }
 
 function backToGroups() {
     document.getElementById('chatInterface').classList.add('hidden');
-    document.getElementById('groupManager').classList.remove('hidden');
     document.getElementById('groupsList').classList.remove('hidden');
-    
-    // Don't disconnect - just leave the group room
     currentGroup = null;
-    replyingTo = null;
+    hideGroupMenu();
+}
+
+function updateGroupMembers() {
+    if (currentGroup) {
+        const membersText = `${currentGroup.members.length} members`;
+        document.getElementById('groupMembers').textContent = membersText;
+    }
 }
 
 function displayMessages() {
     const messagesContainer = document.getElementById('messages');
     messagesContainer.innerHTML = '';
     
-    currentGroup.messages.forEach((message, index) => {
-        const messageElement = createMessageElement(message, index);
-        messagesContainer.appendChild(messageElement);
-    });
+    if (currentGroup.messages) {
+        currentGroup.messages.forEach(message => {
+            const messageElement = createMessageElement(message);
+            messagesContainer.appendChild(messageElement);
+        });
+    }
     
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
-    // Add scroll event listener
-    messagesContainer.addEventListener('scroll', checkScrollPosition);
 }
 
-// Connection status indicator
-function updateConnectionStatus(isConnected, message = '') {
-    const indicator = document.querySelector('.online-indicator');
-    if (indicator) {
-        if (isConnected) {
-            indicator.style.background = '#4caf50';
-            indicator.title = 'Connected to server';
-        } else {
-            indicator.style.background = '#f44336';
-            indicator.title = message || 'Disconnected from server';
-        }
-    }
-}
-
-// Initialize connection status
-document.addEventListener('DOMContentLoaded', function() {
-    updateConnectionStatus(false);
-});
-
-// Only disconnect when user actually leaves the website
-window.addEventListener('beforeunload', function() {
-    if (p2pChat.socket) {
-        p2pChat.disconnect();
-    }
-});
-
-// Close emoji picker when clicking outside
-document.addEventListener('click', function(event) {
-    const emojiPicker = document.getElementById('emojiPicker');
-    const emojiBtn = document.querySelector('.emoji-btn');
-    
-    if (emojiPicker && !emojiPicker.contains(event.target) && event.target !== emojiBtn) {
-        emojiPicker.classList.add('hidden');
-    }
-});
-
-function createMessageElement(message, index) {
+function createMessageElement(message) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${message.sender === currentUser ? 'own' : ''}`;
+    messageDiv.className = `wa-message ${message.sender === currentUser ? 'own' : ''}`;
     
-    let replyHtml = '';
-    if (message.replyTo !== undefined) {
-        const repliedMessage = currentGroup.messages[message.replyTo];
-        if (repliedMessage) {
-            replyHtml = `
-                <div class="reply-indicator">
-                    Replying to ${repliedMessage.sender}: ${repliedMessage.text.substring(0, 50)}${repliedMessage.text.length > 50 ? '...' : ''}
-                </div>
-            `;
-        }
-    }
+    const time = new Date(message.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     
     messageDiv.innerHTML = `
-        <div class="message-info">
-            ${message.sender} • ${new Date(message.timestamp).toLocaleTimeString()}
-        </div>
-        <div class="message-bubble" data-index="${index}">
-            ${replyHtml}
-            <div>${message.text}</div>
-            <button class="reply-button" onclick="setReply(${index})">↩️</button>
+        ${message.sender !== currentUser ? `<div class="wa-message-info">${message.sender}</div>` : ''}
+        <div class="wa-message-bubble">
+            <div class="wa-message-text">${message.text}</div>
+            <div class="wa-message-time">${time}</div>
         </div>
     `;
     
-    // Add swipe functionality
-    const bubble = messageDiv.querySelector('.message-bubble');
-    let startX = 0;
-    let currentX = 0;
-    
-    bubble.addEventListener('touchstart', (e) => {
-        startX = e.touches[0].clientX;
-    });
-    
-    bubble.addEventListener('touchmove', (e) => {
-        currentX = e.touches[0].clientX;
-        const diffX = startX - currentX;
-        
-        if (diffX > 50) {
-            bubble.classList.add('swiped');
-        } else {
-            bubble.classList.remove('swiped');
-        }
-    });
-    
-    bubble.addEventListener('touchend', () => {
-        if (bubble.classList.contains('swiped')) {
-            setReply(index);
-        }
-        bubble.classList.remove('swiped');
-    });
-    
     return messageDiv;
-}
-
-function setReply(messageIndex) {
-    replyingTo = messageIndex;
-    const repliedMessage = currentGroup.messages[messageIndex];
-    const input = document.getElementById('messageText');
-    input.placeholder = `Replying to ${repliedMessage.sender}: ${repliedMessage.text.substring(0, 30)}...`;
-    input.focus();
 }
 
 function sendMessage() {
@@ -419,25 +324,38 @@ function sendMessage() {
     if (!messageText) return;
     
     const message = {
-        id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15),
+        id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
         text: messageText,
         sender: currentUser,
-        timestamp: Date.now(),
-        replyTo: replyingTo
+        timestamp: Date.now()
     };
     
+    // Add to local storage
+    if (!currentGroup.messages) currentGroup.messages = [];
     currentGroup.messages.push(message);
     groups[currentGroup.id] = currentGroup;
     saveGroups();
     
     document.getElementById('messageText').value = '';
-    document.getElementById('messageText').placeholder = 'Type a message...';
-    replyingTo = null;
-    
     displayMessages();
     
-    // Broadcast message to other peers
-    p2pChat.broadcastMessage(message);
+    // Send to server
+    if (socket && isConnected && currentGroup) {
+        socket.emit('send-message', {
+            groupId: currentGroup.id,
+            message: message
+        });
+    }
+}
+
+function receiveMessage(message) {
+    if (message.sender !== currentUser && currentGroup) {
+        if (!currentGroup.messages) currentGroup.messages = [];
+        currentGroup.messages.push(message);
+        groups[currentGroup.id] = currentGroup;
+        saveGroups();
+        displayMessages();
+    }
 }
 
 function handleEnter(event) {
@@ -446,102 +364,82 @@ function handleEnter(event) {
     }
 }
 
-// Group settings
-function showGroupSettings() {
-    if (currentGroup.admin !== currentUser) return;
-    
-    document.getElementById('newGroupName').value = currentGroup.name;
-    displayMembers();
-    document.getElementById('groupSettings').classList.remove('hidden');
+// Group menu
+function showGroupMenu() {
+    document.getElementById('groupMenu').classList.remove('hidden');
 }
 
-function hideGroupSettings() {
-    document.getElementById('groupSettings').classList.add('hidden');
+function hideGroupMenu() {
+    document.getElementById('groupMenu').classList.add('hidden');
+}
+
+function showGroupInfo() {
+    hideGroupMenu();
+    if (currentGroup) {
+        document.getElementById('displayGroupCode').textContent = currentGroup.code;
+        displayMembers();
+        document.getElementById('groupInfo').classList.remove('hidden');
+    }
+}
+
+function hideGroupInfo() {
+    document.getElementById('groupInfo').classList.add('hidden');
 }
 
 function displayMembers() {
     const membersList = document.getElementById('membersList');
-    membersList.innerHTML = `
-        <h4>Group Code: <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${currentGroup.code}</span></h4>
-        <button onclick="copyText('${currentGroup.code}')" style="margin-bottom: 1rem; padding: 8px 16px; background: #25d366; color: white; border: none; border-radius: 4px; cursor: pointer;">Copy Code</button>
-        <h4>Members:</h4>
-    `;
+    membersList.innerHTML = '';
     
-    currentGroup.members.forEach(member => {
-        const memberDiv = document.createElement('div');
-        memberDiv.className = 'member-item';
-        memberDiv.innerHTML = `
-            <span>${member} ${member === currentGroup.admin ? '(Admin)' : ''}</span>
-            ${member !== currentGroup.admin && currentGroup.admin === currentUser ? 
-                `<button onclick="kickMember('${member}')">Kick</button>` : ''}
-        `;
-        membersList.appendChild(memberDiv);
-    });
+    if (currentGroup.members) {
+        currentGroup.members.forEach(member => {
+            const memberDiv = document.createElement('div');
+            memberDiv.className = 'wa-member-item';
+            memberDiv.innerHTML = `
+                <span>${member} ${member === currentGroup.admin ? '(Admin)' : ''}</span>
+            `;
+            membersList.appendChild(memberDiv);
+        });
+    }
 }
 
-function copyText(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        alert('Code copied to clipboard!');
+function copyGroupCode() {
+    const code = currentGroup.code;
+    navigator.clipboard.writeText(code).then(() => {
+        alert('Group code copied!');
     }).catch(() => {
         const textArea = document.createElement('textarea');
-        textArea.value = text;
+        textArea.value = code;
         document.body.appendChild(textArea);
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        alert('Code copied to clipboard!');
+        alert('Group code copied!');
     });
-}
-
-function renameGroup() {
-    const newName = document.getElementById('newGroupName').value.trim();
-    if (!newName) return;
-    
-    currentGroup.name = newName;
-    groups[currentGroup.id] = currentGroup;
-    saveGroups();
-    
-    document.getElementById('groupName').textContent = newName;
-    displayGroups();
-    hideGroupSettings();
-}
-
-function kickMember(memberName) {
-    if (currentGroup.admin !== currentUser) return;
-    
-    currentGroup.members = currentGroup.members.filter(member => member !== memberName);
-    groups[currentGroup.id] = currentGroup;
-    saveGroups();
-    
-    displayMembers();
 }
 
 function leaveGroup() {
     if (!confirm('Are you sure you want to leave this group?')) return;
     
-    // Notify server about leaving
-    if (p2pChat.socket && currentGroup) {
-        p2pChat.socket.emit('leave-group', {
+    hideGroupMenu();
+    
+    // Notify server
+    if (socket && isConnected && currentGroup) {
+        socket.emit('leave-group', {
             groupId: currentGroup.id,
             userName: currentUser
         });
     }
     
     // Remove from local storage
-    if (currentGroup.admin === currentUser) {
-        delete groups[currentGroup.id];
-    } else {
-        currentGroup.members = currentGroup.members.filter(member => member !== currentUser);
-        groups[currentGroup.id] = currentGroup;
-    }
-    
+    delete groups[currentGroup.id];
     saveGroups();
+    
     backToGroups();
     displayGroups();
 }
 
-// Emoji and UI functions
-function toggleEmojiPicker() {
+// Emoji functionality
+function toggleEmoji() {
     const picker = document.getElementById('emojiPicker');
     picker.classList.toggle('hidden');
 }
@@ -553,41 +451,26 @@ function addEmoji(emoji) {
     document.getElementById('emojiPicker').classList.add('hidden');
 }
 
-function handleTyping() {
-    // Simple typing indicator (can be enhanced with socket events)
-    const input = document.getElementById('messageText');
-    if (input.value.trim()) {
-        // Show typing to others (implement with socket if needed)
-    }
-}
-
-function scrollToBottom() {
-    const messages = document.getElementById('messages');
-    messages.scrollTop = messages.scrollHeight;
-    document.getElementById('scrollBottom').classList.add('hidden');
-}
-
-// Auto-hide scroll button when at bottom
-function checkScrollPosition() {
-    const messages = document.getElementById('messages');
-    const scrollBtn = document.getElementById('scrollBottom');
+// Close menus when clicking outside
+document.addEventListener('click', function(event) {
+    const groupMenu = document.getElementById('groupMenu');
+    const menuBtn = document.querySelector('.wa-menu-btn');
     
-    if (messages.scrollTop < messages.scrollHeight - messages.clientHeight - 50) {
-        scrollBtn.classList.remove('hidden');
-    } else {
-        scrollBtn.classList.add('hidden');
+    if (groupMenu && !groupMenu.contains(event.target) && event.target !== menuBtn) {
+        hideGroupMenu();
     }
-}
+    
+    const emojiPicker = document.getElementById('emojiPicker');
+    const emojiBtn = document.querySelector('.wa-emoji-btn');
+    
+    if (emojiPicker && !emojiPicker.contains(event.target) && event.target !== emojiBtn) {
+        emojiPicker.classList.add('hidden');
+    }
+});
 
-function showSettings() {
-    const action = confirm('Do you want to change your name?');
-    if (action) {
-        const newName = prompt('Enter new name:', currentUser);
-        if (newName && newName.trim()) {
-            currentUser = newName.trim();
-            const userData = { name: currentUser, id: generateUserIP() };
-            localStorage.setItem('p2p_user', JSON.stringify(userData));
-            document.getElementById('currentUser').textContent = currentUser;
-        }
+// Disconnect only when leaving website
+window.addEventListener('beforeunload', function() {
+    if (socket) {
+        socket.disconnect();
     }
-}
+});

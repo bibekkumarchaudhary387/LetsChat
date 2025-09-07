@@ -121,15 +121,16 @@ io.on('connection', (socket) => {
             // If admin leaves or no members left, delete group
             if (group.admin === userName || group.members.length === 0) {
                 groups.delete(groupId);
+                // Notify others that group is deleted
+                socket.to(groupId).emit('group-deleted', { groupId });
             } else {
                 groups.set(groupId, group);
+                // Notify others about member leaving
+                socket.to(groupId).emit('user-left', {
+                    userName: userName,
+                    members: group.members
+                });
             }
-            
-            // Notify others
-            socket.to(groupId).emit('user-left', {
-                userName: userName,
-                members: group.members
-            });
         }
         
         socket.leave(groupId);

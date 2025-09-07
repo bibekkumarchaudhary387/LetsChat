@@ -3,113 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Chat</title>
+    <title>WhatsApp Chat</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <!-- Name Entry Popup -->
     <div id="namePopup" class="popup">
         <div class="popup-content">
-            <h2>Welcome to P2P Chat</h2>
-            <input type="text" id="userName" placeholder="Enter your name" maxlength="20">
-            <button onclick="setUserName()">Continue</button>
+            <div class="wa-logo">💬</div>
+            <h2>Welcome to Chat</h2>
+            <p>Enter your name to continue</p>
+            <input type="text" id="userName" placeholder="Your name" maxlength="25">
+            <button onclick="setUserName()" class="wa-btn">Continue</button>
         </div>
     </div>
 
     <!-- Main App -->
     <div id="app" class="hidden">
-        <!-- Header -->
-        <header>
-            <h1>P2P Chat</h1>
-            <div class="user-info">
-                <span id="currentUser"></span>
-                <span class="online-indicator"></span>
-                <button onclick="showSettings()" title="Settings">⚙️</button>
+        <!-- WhatsApp Header -->
+        <header class="wa-header">
+            <div class="wa-header-content">
+                <h1>Chats</h1>
+                <div class="wa-header-actions">
+                    <span id="currentUser"></span>
+                    <div class="connection-dot" id="connectionDot"></div>
+                </div>
             </div>
         </header>
 
-        <!-- Group Management -->
-        <div id="groupManager" class="section">
-            <div class="group-actions">
-                <button onclick="createGroup()">Create Group</button>
-                <button onclick="showJoinGroup()">Join Group</button>
-            </div>
-            
-            <div id="joinGroupForm" class="hidden">
-                <input type="text" id="groupLink" placeholder="Paste group link or code here">
-                <button onclick="joinGroup()">Join</button>
-                <button onclick="hideJoinGroup()">Cancel</button>
-            </div>
-        </div>
+        <!-- Main Content -->
+        <div id="mainContent" class="wa-main">
+            <!-- Groups List -->
+            <div id="groupsList" class="wa-chats">
+                <div class="wa-actions">
+                    <button onclick="createGroup()" class="wa-action-btn">
+                        <span class="wa-icon">➕</span>
+                        New Group
+                    </button>
+                    <button onclick="showJoinGroup()" class="wa-action-btn">
+                        <span class="wa-icon">🔗</span>
+                        Join Group
+                    </button>
+                </div>
+                
+                <div id="joinGroupForm" class="wa-join-form hidden">
+                    <input type="text" id="groupLink" placeholder="Enter group code or link">
+                    <div class="wa-join-actions">
+                        <button onclick="joinGroup()" class="wa-btn">Join</button>
+                        <button onclick="hideJoinGroup()" class="wa-btn-secondary">Cancel</button>
+                    </div>
+                </div>
 
-        <!-- Groups List -->
-        <div id="groupsList" class="section">
-            <h3>Your Groups</h3>
-            <div id="groups"></div>
-        </div>
-
-        <!-- Chat Interface -->
-        <div id="chatInterface" class="hidden">
-            <div class="chat-header">
-                <button onclick="backToGroups()">←</button>
-                <span id="groupName"></span>
-                <div class="chat-actions">
-                    <button onclick="showGroupSettings()" id="adminBtn" class="hidden" title="Settings">⚙️</button>
-                    <button onclick="leaveGroup()" title="Leave">Leave</button>
+                <div class="wa-chats-list">
+                    <div id="groups"></div>
                 </div>
             </div>
 
-            <div id="messages" class="messages"></div>
-            
-            <div class="message-input">
-                <input type="text" id="messageText" placeholder="Type a message..." onkeypress="handleEnter(event)">
-                <button onclick="sendMessage()">Send</button>
+            <!-- Chat Interface -->
+            <div id="chatInterface" class="wa-chat hidden">
+                <!-- Chat Header -->
+                <div class="wa-chat-header">
+                    <button onclick="backToGroups()" class="wa-back-btn">←</button>
+                    <div class="wa-chat-info">
+                        <h3 id="groupName"></h3>
+                        <small id="groupMembers"></small>
+                    </div>
+                    <div class="wa-chat-actions">
+                        <button onclick="showGroupMenu()" class="wa-menu-btn">⋮</button>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div id="messages" class="wa-messages"></div>
+                
+                <!-- Message Input -->
+                <div class="wa-input-area">
+                    <button onclick="toggleEmoji()" class="wa-emoji-btn">😊</button>
+                    <input type="text" id="messageText" placeholder="Type a message" onkeypress="handleEnter(event)">
+                    <button onclick="sendMessage()" class="wa-send-btn">➤</button>
+                </div>
+
+                <!-- Emoji Picker -->
+                <div id="emojiPicker" class="wa-emoji-picker hidden">
+                    <div class="wa-emoji-grid">
+                        <span onclick="addEmoji('😀')">😀</span>
+                        <span onclick="addEmoji('😂')">😂</span>
+                        <span onclick="addEmoji('😍')">😍</span>
+                        <span onclick="addEmoji('🤔')">🤔</span>
+                        <span onclick="addEmoji('😊')">😊</span>
+                        <span onclick="addEmoji('😎')">😎</span>
+                        <span onclick="addEmoji('👍')">👍</span>
+                        <span onclick="addEmoji('👎')">👎</span>
+                        <span onclick="addEmoji('❤️')">❤️</span>
+                        <span onclick="addEmoji('🔥')">🔥</span>
+                        <span onclick="addEmoji('💯')">💯</span>
+                        <span onclick="addEmoji('🎉')">🎉</span>
+                    </div>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Group Menu -->
+    <div id="groupMenu" class="wa-menu hidden">
+        <div class="wa-menu-content">
+            <button onclick="showGroupInfo()" class="wa-menu-item">
+                <span class="wa-menu-icon">ℹ️</span>
+                Group Info
+            </button>
+            <button onclick="leaveGroup()" class="wa-menu-item wa-menu-danger">
+                <span class="wa-menu-icon">🚪</span>
+                Leave Group
+            </button>
+        </div>
+    </div>
+
+    <!-- Group Info Modal -->
+    <div id="groupInfo" class="popup hidden">
+        <div class="popup-content">
+            <h3>Group Info</h3>
+            <div class="wa-group-code">
+                <label>Group Code:</label>
+                <div class="wa-code-display">
+                    <span id="displayGroupCode"></span>
+                    <button onclick="copyGroupCode()" class="wa-copy-btn">Copy</button>
+                </div>
+            </div>
+            <div class="wa-members">
+                <h4>Members</h4>
+                <div id="membersList"></div>
+            </div>
+            <button onclick="hideGroupInfo()" class="wa-btn">Close</button>
         </div>
     </div>
 
     <!-- Create Group Modal -->
     <div id="createGroupModal" class="popup hidden">
         <div class="popup-content">
-            <h3>Create New Group</h3>
-            <input type="text" id="newGroupNameInput" placeholder="Enter group name" maxlength="30">
-            <button onclick="confirmCreateGroup()">Create Group</button>
-            <button onclick="hideCreateGroup()">Cancel</button>
-        </div>
-    </div>
-
-    <!-- Group Link Modal -->
-    <div id="groupLinkModal" class="popup hidden">
-        <div class="popup-content">
-            <h3>Group Created Successfully! 🎉</h3>
-            <p><strong>Group Code:</strong> <span id="groupCode" style="font-family: monospace; background: #f0f0f0; padding: 4px 8px; border-radius: 4px;"></span></p>
-            <p>Share this link to invite members:</p>
-            <div class="link-container">
-                <input type="text" id="groupLinkDisplay" readonly>
-                <button onclick="copyGroupLink()">Copy Link</button>
+            <h3>New Group</h3>
+            <input type="text" id="newGroupName" placeholder="Group name" maxlength="25">
+            <div class="wa-modal-actions">
+                <button onclick="confirmCreateGroup()" class="wa-btn">Create</button>
+                <button onclick="hideCreateGroup()" class="wa-btn-secondary">Cancel</button>
             </div>
-            <div class="link-container">
-                <input type="text" id="groupCodeDisplay" readonly>
-                <button onclick="copyGroupCode()">Copy Code</button>
-            </div>
-            <button onclick="hideGroupLink()">Done</button>
-        </div>
-    </div>
-
-    <!-- Group Settings Modal -->
-    <div id="groupSettings" class="popup hidden">
-        <div class="popup-content">
-            <h3>Group Settings</h3>
-            <input type="text" id="newGroupName" placeholder="New group name">
-            <button onclick="renameGroup()">Rename Group</button>
-            <div id="membersList"></div>
-            <button onclick="hideGroupSettings()">Close</button>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="crypto.js"></script>
-    <script src="webrtc.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
