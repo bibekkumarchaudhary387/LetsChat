@@ -189,7 +189,16 @@ function hideJoinGroup() {
 
 function joinGroup() {
     const input = document.getElementById('groupLink').value.trim();
-    if (!input) return;
+    if (!input) {
+        alert('Please enter a group code or link');
+        return;
+    }
+    
+    // Show loading state
+    const joinBtn = document.querySelector('#joinGroupForm button:first-of-type');
+    const originalText = joinBtn.textContent;
+    joinBtn.textContent = 'Joining...';
+    joinBtn.disabled = true;
     
     // Check if it's a link or code
     if (input.startsWith('http')) {
@@ -200,19 +209,36 @@ function joinGroup() {
                 p2pChat.connect(groupId);
             } else {
                 alert('Invalid group link');
+                resetJoinButton(joinBtn, originalText);
                 return;
             }
         } catch (e) {
             alert('Invalid group link');
+            resetJoinButton(joinBtn, originalText);
             return;
         }
     } else {
-        // It's a code
-        const code = input.toUpperCase();
+        // It's a code - validate format
+        const code = input.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (code.length < 3) {
+            alert('Group code must be at least 3 characters');
+            resetJoinButton(joinBtn, originalText);
+            return;
+        }
         p2pChat.joinByCode(code);
     }
     
+    // Reset button after 3 seconds
+    setTimeout(() => {
+        resetJoinButton(joinBtn, originalText);
+    }, 3000);
+    
     hideJoinGroup();
+}
+
+function resetJoinButton(btn, originalText) {
+    btn.textContent = originalText;
+    btn.disabled = false;
 }
 
 function checkGroupFromURL() {
@@ -430,7 +456,11 @@ function hideGroupSettings() {
 
 function displayMembers() {
     const membersList = document.getElementById('membersList');
-    membersList.innerHTML = '<h4>Members:</h4>';
+    membersList.innerHTML = `
+        <h4>Group Code: <span style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${currentGroup.code}</span></h4>
+        <button onclick="copyText('${currentGroup.code}')" style="margin-bottom: 1rem; padding: 8px 16px; background: #25d366; color: white; border: none; border-radius: 4px; cursor: pointer;">Copy Code</button>
+        <h4>Members:</h4>
+    `;
     
     currentGroup.members.forEach(member => {
         const memberDiv = document.createElement('div');
@@ -441,6 +471,20 @@ function displayMembers() {
                 `<button onclick="kickMember('${member}')">Kick</button>` : ''}
         `;
         membersList.appendChild(memberDiv);
+    });
+}
+
+function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Code copied to clipboard!');
+    }).catch(() => {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('Code copied to clipboard!');
     });
 }
 

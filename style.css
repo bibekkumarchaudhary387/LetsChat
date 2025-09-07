@@ -214,6 +214,15 @@ body {
         right: 5px;
         padding: 0.75rem;
     }
+    
+    /* Ensure chat options are visible on mobile */
+    .hidden {
+        display: none !important;
+    }
+    
+    .chat-actions button:not(.hidden) {
+        display: inline-block !important;
+    }
 }
 
 /* Main App */
@@ -634,6 +643,22 @@ header h1 {
     
     .chat-header {
         padding: 0.75rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .chat-actions {
+        display: flex !important;
+        gap: 0.5rem;
+        margin-left: auto;
+    }
+    
+    .chat-actions button {
+        display: block !important;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+        border-radius: 15px;
     }
     
     .message-input {
@@ -666,6 +691,33 @@ header h1 {
     .message-bubble {
         max-width: 85%;
         padding: 10px 14px;
+    }
+    
+    .chat-actions {
+        display: flex;
+        gap: 0.25rem;
+    }
+    
+    .chat-actions button {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+        min-width: auto;
+    }
+    
+    #adminBtn {
+        display: block !important;
+    }
+    
+    .chat-header {
+        flex-wrap: wrap;
+    }
+    
+    .chat-header #groupName {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 }
 
