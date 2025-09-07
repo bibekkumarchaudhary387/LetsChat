@@ -35,7 +35,7 @@
             </div>
             
             <div id="joinGroupForm" class="hidden">
-                <input type="text" id="groupLink" placeholder="Paste group link here">
+                <input type="text" id="groupLink" placeholder="Paste group link or code here">
                 <button onclick="joinGroup()">Join</button>
                 <button onclick="hideJoinGroup()">Cancel</button>
             </div>
@@ -81,10 +81,15 @@
     <div id="groupLinkModal" class="popup hidden">
         <div class="popup-content">
             <h3>Group Created Successfully! 🎉</h3>
+            <p><strong>Group Code:</strong> <span id="groupCode" style="font-family: monospace; background: #f0f0f0; padding: 4px 8px; border-radius: 4px;"></span></p>
             <p>Share this link to invite members:</p>
             <div class="link-container">
                 <input type="text" id="groupLinkDisplay" readonly>
-                <button onclick="copyGroupLink()">Copy</button>
+                <button onclick="copyGroupLink()">Copy Link</button>
+            </div>
+            <div class="link-container">
+                <input type="text" id="groupCodeDisplay" readonly>
+                <button onclick="copyGroupCode()">Copy Code</button>
             </div>
             <button onclick="hideGroupLink()">Done</button>
         </div>
@@ -102,6 +107,7 @@
     </div>
 
     <script src="crypto.js"></script>
+    <script src="webrtc.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

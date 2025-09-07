@@ -113,8 +113,11 @@ function confirmCreateGroup() {
     }
     
     const groupId = 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+    const groupCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
     const group = {
         id: groupId,
+        code: groupCode,
         name: groupName,
         admin: currentUser,
         members: [currentUser],
@@ -128,12 +131,14 @@ function confirmCreateGroup() {
     
     // Hide create modal and show link modal
     hideCreateGroup();
-    showGroupLink(groupId);
+    showGroupLink(groupId, groupCode);
 }
 
-function showGroupLink(groupId) {
+function showGroupLink(groupId, groupCode) {
     const groupLink = `${window.location.origin}${window.location.pathname}?group=${groupId}`;
     document.getElementById('groupLinkDisplay').value = groupLink;
+    document.getElementById('groupCodeDisplay').value = groupCode;
+    document.getElementById('groupCode').textContent = groupCode;
     document.getElementById('groupLinkModal').classList.remove('hidden');
 }
 
@@ -143,19 +148,30 @@ function hideGroupLink() {
 
 function copyGroupLink() {
     const linkInput = document.getElementById('groupLinkDisplay');
-    linkInput.select();
-    linkInput.setSelectionRange(0, 99999);
-    
+    copyToClipboard(linkInput.value, 'Link copied to clipboard!');
+}
+
+function copyGroupCode() {
+    const codeInput = document.getElementById('groupCodeDisplay');
+    copyToClipboard(codeInput.value, 'Code copied to clipboard!');
+}
+
+function copyToClipboard(text, message) {
     try {
-        document.execCommand('copy');
-        alert('Link copied to clipboard!');
-    } catch (err) {
-        // Fallback for modern browsers
-        navigator.clipboard.writeText(linkInput.value).then(() => {
-            alert('Link copied to clipboard!');
+        navigator.clipboard.writeText(text).then(() => {
+            alert(message);
         }).catch(() => {
-            alert('Please copy the link manually');
+            // Fallback
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            alert(message);
         });
+    } catch (err) {
+        alert('Please copy manually: ' + text);
     }
 }
 
@@ -169,36 +185,58 @@ function hideJoinGroup() {
 }
 
 function joinGroup() {
-    const link = document.getElementById('groupLink').value.trim();
-    if (!link) return;
+    const input = document.getElementById('groupLink').value.trim();
+    if (!input) return;
     
-    const url = new URL(link);
-    const groupId = url.searchParams.get('group');
+    let groupId = null;
+    
+    // Check if it's a link or code
+    if (input.startsWith('http')) {
+        try {
+            const url = new URL(input);
+            groupId = url.searchParams.get('group');
+        } catch (e) {
+            alert('Invalid group link');
+            return;
+        }
+    } else {
+        // It's a code, find group by code
+        const code = input.toUpperCase();
+        const foundGroup = Object.values(groups).find(g => g.code === code);
+        if (foundGroup) {
+            groupId = foundGroup.id;
+        } else {
+            // Create new group with this code (for P2P joining)
+            groupId = 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 15);
+            const groupName = prompt('Enter group name (you are joining):') || 'New Group';
+            groups[groupId] = {
+                id: groupId,
+                code: code,
+                name: groupName,
+                admin: 'Unknown',
+                members: [currentUser],
+                messages: [],
+                created: Date.now()
+            };
+        }
+    }
     
     if (!groupId) {
-        alert('Invalid group link');
+        alert('Invalid group link or code');
         return;
     }
     
-    // In a real P2P system, this would connect to the group
-    // For now, we'll create a placeholder group
-    if (!groups[groupId]) {
-        const groupName = prompt('Enter group name (you are joining):') || 'Unknown Group';
-        groups[groupId] = {
-            id: groupId,
-            name: groupName,
-            admin: 'Unknown',
-            members: [currentUser],
-            messages: [],
-            created: Date.now()
-        };
-    } else if (!groups[groupId].members.includes(currentUser)) {
+    // Join existing group or add to members
+    if (groups[groupId] && !groups[groupId].members.includes(currentUser)) {
         groups[groupId].members.push(currentUser);
     }
     
     saveGroups();
     displayGroups();
     hideJoinGroup();
+    
+    // Connect to P2P network for this group
+    p2pChat.connect(groupId);
 }
 
 function checkGroupFromURL() {
@@ -243,12 +281,19 @@ function openChat(groupId) {
     }
     
     displayMessages();
+    
+    // Connect to P2P network for real-time communication
+    p2pChat.connect(groupId);
 }
 
 function backToGroups() {
     document.getElementById('chatInterface').classList.add('hidden');
     document.getElementById('groupManager').classList.remove('hidden');
     document.getElementById('groupsList').classList.remove('hidden');
+    
+    // Disconnect from P2P network
+    p2pChat.disconnect();
+    
     currentGroup = null;
     replyingTo = null;
 }
@@ -351,6 +396,9 @@ function sendMessage() {
     replyingTo = null;
     
     displayMessages();
+    
+    // Broadcast message to other peers
+    p2pChat.broadcastMessage(message);
 }
 
 function handleEnter(event) {
